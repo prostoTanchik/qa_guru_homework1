@@ -3,3 +3,5 @@ pytest>=7.4.0
 fastapi=0.115.12
 uvicorn~=0.34.3
 fastapi~=0.115.12
+pydantic~=2.11.5
+fastapi-pagination~=0.13.2

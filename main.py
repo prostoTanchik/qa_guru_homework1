@@ -1,66 +1,42 @@
-from fastapi import FastAPI, HTTPException
+import json
+from http import HTTPStatus
+from fastapi import FastAPI, HTTPException, Query
+from fastapi_pagination import Page, add_pagination, paginate
+from fastapi_pagination.customization import CustomizedPage, UseParamsFields
+from typing import TypeVar
+from models.AppStatus import AppStatus
+from models.User import User
 
 app = FastAPI()
+add_pagination(app)
 
-users = {
-        7: {
-            "id": 7,
-            "email": "michael.lawson@reqres.in",
-            "first_name": "Michael",
-            "last_name": "Lawson",
-            "avatar": "https://reqres.in/img/faces/7-image.jpg"
-        },
-        8: {
-            "id": 8,
-            "email": "lindsay.ferguson@reqres.in",
-            "first_name": "Lindsay",
-            "last_name": "Ferguson",
-            "avatar": "https://reqres.in/img/faces/8-image.jpg"
-        },
-        9: {
-            "id": 9,
-            "email": "tobias.funke@reqres.in",
-            "first_name": "Tobias",
-            "last_name": "Funke",
-            "avatar": "https://reqres.in/img/faces/9-image.jpg"
-        },
-        10: {
-            "id": 10,
-            "email": "byron.fields@reqres.in",
-            "first_name": "Byron",
-            "last_name": "Fields",
-            "avatar": "https://reqres.in/img/faces/10-image.jpg"
-        },
-        11: {
-            "id": 11,
-            "email": "george.edwards@reqres.in",
-            "first_name": "George",
-            "last_name": "Edwards",
-            "avatar": "https://reqres.in/img/faces/11-image.jpg"
-        },
-        12: {
-            "id": 12,
-            "email": "rachel.howell@reqres.in",
-            "first_name": "Rachel",
-            "last_name": "Howell",
-            "avatar": "https://reqres.in/img/faces/12-image.jpg"
-        }
-        }
+
+users: list[User] = []
+
+
+@app.get("/status", status_code=HTTPStatus.OK)
+def status() -> AppStatus:
+    return AppStatus(users=bool(users))
 
 
 @app.get("/api/users")
-def get_users():
-    return users
+async def get_users() -> Page[User]:
+    return paginate(users)
 
 
 @app.get("/api/users/{user_id}")
-def get_user(user_id: int):
-    user = users.get(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+def get_user(user_id: int) -> User:
+    if user_id < 1:
+        raise HTTPException(status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail="Invalid user id")
+    if user_id > len(users):
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="User not found")
+    return users[user_id - 1]
 
 
 if __name__ == "__main__":
     import uvicorn
+    with open("users.json") as f:
+        users = json.load(f)
+    for user in users:
+        User.model_validate(user)
     uvicorn.run(app, host="127.0.0.1", port=8000)
