@@ -16,10 +16,28 @@ def list_of_users(app_url):
 def default_users_per_page():
     return 3
 
+@pytest.fixture
+def users_ids_counter(list_of_users):
+    return len([user["id"] for user in list_of_users["items"]])
 
-def total_pages(list_of_users, users_per_page):
-    total_users = len(list_of_users["items"])
-    return math.ceil(total_users/users_per_page)
+
+def calculate_expected_values(total_items, page_size, page_num):
+    total_pages = math.ceil(total_items/page_size)
+    is_last_page = page_num == total_pages
+
+    if total_items == 0:
+        expected_items = 0
+    elif is_last_page:
+        expected_items = total_items % page_size or page_size
+    else:
+        expected_items = page_size
+
+    return {
+        "page": page_num,
+        "size": page_size,
+        "pages": total_pages,
+        "items": expected_items
+    }
 
 
 def test_get_users(app_url):
@@ -30,9 +48,8 @@ def test_get_users(app_url):
         User.model_validate(user)
 
 
-def test_users_no_dublicate(list_of_users):
-    users_ids = [user["id"] for user in list_of_users["items"]]
-    assert len(users_ids) == len(set(users_ids))
+def test_users_no_dublicate(list_of_users, users_ids_counter):
+    assert len(users_ids_counter) == len(set(users_ids_counter))
 
 
 @pytest.mark.parametrize("user_id", [i for i in range(1, 12)])
@@ -43,26 +60,32 @@ def test_get_user(app_url, user_id):
     User.model_validate(user)
 
 
-@pytest.mark.parametrize("page_num", [1, 2, 3, 4])
-def test_size_of_page(app_url, list_of_users, page_num, default_users_per_page):
-    response = requests.get(f"{app_url}/api/users?page={page_num}&size={default_users_per_page}")
-    assert response.status_code == HTTPStatus.OK
-    pages_quantity = total_pages(list_of_users, default_users_per_page)
-    users = response.json()
-    users_ids = len([user["id"] for user in list_of_users["items"]])
-    if page_num < pages_quantity:
-        assert len(users["items"]) == default_users_per_page
-    elif page_num == pages_quantity:
-        assert len(users["items"]) in [users_ids % default_users_per_page, default_users_per_page]
+@pytest.mark.parametrize("page_size", [i for i in range(1, 13)])
+def test_size_of_page(app_url, list_of_users, page_size, users_ids_counter):
+    max_page = math.ceil(users_ids_counter / page_size)
+
+    for page_num in range(1, max_page + 1):
+        response = requests.get(f"{app_url}/api/users?page={page_num}&size={page_size}")
+        assert response.status_code == HTTPStatus.OK
+        expected = calculate_expected_values(users_ids_counter, page_size, page_num)
+        response_data = response.json()
+        print(response_data)
+        assert response_data["page"] == expected["page"]
+        assert response_data["size"] == expected["size"]
+        assert response_data["pages"] == expected["pages"]
+        assert len(response_data["items"]) == expected["items"]
 
 
-@pytest.mark.parametrize("page_size", [1, 3, 12, 13])
-def test_page_quantity(app_url, list_of_users, page_size):
-    pages_quantity = total_pages(list_of_users, page_size)
-    response = requests.get(f"{app_url}/api/users?page={pages_quantity}&size={page_size}")
-    assert response.status_code == HTTPStatus.OK
-    users = response.json()
-    assert users["items"] != 0
+@pytest.mark.parametrize("page_size", [i for i in range(1, 13)])
+def test_page_quantity(app_url, list_of_users, page_size, users_ids_counter):
+    max_page = math.ceil(users_ids_counter / page_size)
+    for page_num in range(1, max_page + 1):
+        expected = calculate_expected_values(users_ids_counter, page_size, page_num)
+        response = requests.get(f"{app_url}/api/users?page={page_num}&size={page_size}")
+        assert response.status_code == HTTPStatus.OK
+        response_data = response.json()
+        assert len(response_data["items"]) == expected["items"]
+        assert response_data["pages"] == max_page
 
 
 def test_no_dublicate_pages(app_url, list_of_users, default_users_per_page):
