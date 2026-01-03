@@ -1,7 +1,4 @@
 on:
-  push:
-    branches:
-      - 4_docker
 
   pull_request:
     branches:
