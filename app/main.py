@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-
 import dotenv
 dotenv.load_dotenv()
 import json
@@ -12,6 +11,7 @@ from app.routers import status, users
 from app.models.User import User
 # from database import users_db
 import uvicorn
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
